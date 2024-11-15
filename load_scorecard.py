@@ -1,6 +1,7 @@
 import psycopg
 import csv
 import sys
+import re
 from psycopg.errors import ForeignKeyViolation
 import credentials
 
@@ -44,6 +45,27 @@ def clean_data(row, columns):
     return cleaned_data
 
 
+def extract_year_from_filename(filename):
+    """
+    Extracts the academic end year from the provided filename in the format YYYY.
+
+    Args:
+        filename (str): The name of the file being processed.
+
+    Returns:
+        int: The academic end year in the format YYYY (e.g., 2019 for "MERGED2018_19").
+    """
+    match = re.search(r'MERGED(\d{4})_(\d{2})_', filename)
+    if not match:
+        raise ValueError(f"Filename {filename} does not follow expected format MERGEDYYYY_YY_*.csv")
+    
+    # Extract starting year and increment by 1 to get the academic end year
+    start_year = int(match.group(1))
+    end_year = start_year + 1
+
+    return end_year
+
+
 def insert_data(cursor, table, data, columns):
     """
     Inserts data into the specified table.
@@ -76,6 +98,7 @@ def load_scorecard_data(file_path):
     """
     conn = connect_db()
     cursor = conn.cursor()
+    year = extract_year_from_filename(file_path)
 
     try:
         with open(file_path, mode='r', encoding='ISO-8859-1') as file:
@@ -104,8 +127,8 @@ def load_scorecard_data(file_path):
             admissions_data = []
 
             for row in reader:
-                year = 2019  # Example year; replace with actual
-                # year if available
+                #year = 2019 
+                
 
                 # Prepare data for each table
                 institution_row = clean_data(row, institutions_columns)
@@ -161,7 +184,7 @@ def load_scorecard_data(file_path):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python load_scorecard_aki.py <csv_file>")
+        print("Usage: python load_scorecard.py <csv_file>")
         sys.exit(1)
 
     load_scorecard_data(sys.argv[1])
