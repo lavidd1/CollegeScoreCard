@@ -2,7 +2,6 @@ import psycopg
 import csv
 import sys
 import re
-from psycopg.errors import ForeignKeyViolation
 import credentials
 
 
@@ -47,18 +46,18 @@ def clean_data(row, columns):
 
 def extract_year_from_filename(filename):
     """
-    Extracts the academic end year from the provided filename in the format YYYY.
+    Extracts the academic end year from filename.
 
     Args:
         filename (str): The name of the file being processed.
 
     Returns:
-        int: The academic end year in the format YYYY (e.g., 2019 for "MERGED2018_19").
+        int: The academic end year in the format YYYY.
     """
     match = re.search(r'MERGED(\d{4})_(\d{2})_', filename)
     if not match:
-        raise ValueError(f"Filename {filename} does not follow expected format MERGEDYYYY_YY_*.csv")
-    
+        raise ValueError("Filename must have format MERGEDYYYY_YY_*.csv")
+
     # Extract starting year and increment by 1 to get the academic end year
     start_year = int(match.group(1))
     end_year = start_year + 1
@@ -103,7 +102,6 @@ def load_scorecard_data(file_path):
     try:
         with open(file_path, mode='r', encoding='ISO-8859-1') as file:
             reader = csv.DictReader(file)
-            available_columns = reader.fieldnames
 
             institutions_columns = [
                 "UNITID", "OPEID", "INSTNM", "CONTROL", "ACCREDAGENCY",
@@ -127,9 +125,6 @@ def load_scorecard_data(file_path):
             admissions_data = []
 
             for row in reader:
-                #year = 2019 
-                
-
                 # Prepare data for each table
                 institution_row = clean_data(row, institutions_columns)
                 institutions_data.append(tuple(institution_row.values()))
