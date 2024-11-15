@@ -83,8 +83,10 @@ def insert_data(cursor, table, data, columns):
     )
     print(f"Executing SQL: {sql}")  # Debugging: print SQL statement for review
     print(f"Data sample: {data[0]}")  # Debugging: print the
-    # first data row for review
-    cursor.executemany(sql, data)
+    try:
+        cursor.executemany(sql, data)
+    except Exception as e:
+        raise Exception(f"DB error during insertion into {table}: {str(e)}")
 
 
 def load_scorecard_data(file_path):
@@ -124,21 +126,33 @@ def load_scorecard_data(file_path):
             financial_data = []
             admissions_data = []
 
+            row_count = 0
+            skipped_rows = 0
             for row in reader:
-                # Prepare data for each table
-                institution_row = clean_data(row, institutions_columns)
-                institutions_data.append(tuple(institution_row.values()))
+                row_count += 1
+                try:
+                    # Prepare data for each table
+                    institution_row = clean_data(row, institutions_columns)
+                    institutions_data.append(tuple(institution_row.values()))
 
-                location_row = clean_data(row, location_columns)
-                location_data.append(tuple(location_row.values()))
+                    location_row = clean_data(row, location_columns)
+                    location_data.append(tuple(location_row.values()))
 
-                financial_row = clean_data(row, financial_data_columns)
-                financial_data.append((year,) + tuple(financial_row.values()))
-                # YEAR added here
+                    financial_row = clean_data(row, financial_data_columns)
+                    financial_data.append(
+                        (year,) + tuple(financial_row.values())
+                        )
+                    # YEAR added here
 
-                admissions_row = clean_data(row, admissions_data_columns)
-                admissions_data.append((year,) +
-                                       tuple(admissions_row.values()))
+                    admissions_row = clean_data(row, admissions_data_columns)
+                    admissions_data.append(
+                        (year,) + tuple(admissions_row.values()))
+                except Exception as e:
+                    print(f"Error processing row {row_count}: {row}")
+                    print(f"Error details: {e}")
+                    skipped_rows += 1
+                    conn.rollback()
+                    sys.exit(1)
                 # YEAR added here
 
             # Insert data in batch
@@ -167,9 +181,22 @@ def load_scorecard_data(file_path):
                             ["YEAR"] + admissions_data_columns)
 
             conn.commit()
+            print("Summary:")
+            print(f"Total rows read from CSV: {row_count}")
+            print(f"Rows skipped due to errors: {skipped_rows}")
+            print(f"Rows successfully inserted "
+                  f" into Institutions: {len(institutions_data)}")
+            print(f"Rows successfully inserted"
+                  f" into Location: {len(location_data)}")
+            print(f"Rows successfully inserted"
+                  f" into Financial_Data: {len(financial_data)}")
+            print(f"Rows successfully inserted"
+                  f" into Admissions_Data: {len(admissions_data)}")
             print("Data from College Scorecard loaded successfully.")
 
     except Exception as e:
+        print(f"Error processing row {row_count}: {row}")
+        print(f"Error details: {e}")
         conn.rollback()
         print(f"Error: {e}")
     finally:
@@ -181,5 +208,4 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python load_scorecard.py <csv_file>")
         sys.exit(1)
-
     load_scorecard_data(sys.argv[1])

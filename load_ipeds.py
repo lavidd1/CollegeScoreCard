@@ -123,23 +123,29 @@ def insert_data(cursor, table, data, columns):
         cursor (psycopg.Cursor): The database cursor object.
         table (str): The name of the table to insert data into.
         data (list of tuple): A list of tuples representing rows of data
-            to insert.
+                              to insert.
         columns (list): A list of columns corresponding to the data.
     """
     placeholders = ', '.join(['%s'] * len(columns))
+    update_clause = ', '.join([f"{col} = EXCLUDED.{col}" for col in columns])
     sql = (
-        f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders}) "
-        "ON CONFLICT DO NOTHING"
+        f"INSERT INTO {table} ({', '.join(columns)}) "
+        f"VALUES ({placeholders}) "
+        f"ON CONFLICT (YEAR, UNITID) DO UPDATE SET {update_clause}"
     )
-    print(f"Executing SQL: {sql}")
-    print(f"Data sample: {data[0]}")
-    cursor.executemany(sql, data)
+    try:
+        print(f"Executing SQL: {sql}")
+        print(f"Data sample: {data[0]}")
+        cursor.executemany(sql, data)
+    except Exception as e:
+        raise Exception(f"Error inserting into {table}: {str(e)}")
 
 
 def load_ipeds_data(file_path):
     conn = connect_db()
     cursor = conn.cursor()
     year = extract_year_from_filename(file_path)
+    data_year = year - 1
 
     try:
         with open(file_path, mode='r', encoding='ISO-8859-1') as file:
@@ -162,8 +168,10 @@ def load_ipeds_data(file_path):
 
             ipeds_data = []
             skipped_records = 0
+            total_rows = 0
 
             for row in reader:
+                total_rows += 1
                 unitid = row.get("UNITID")
                 if not check_unitid_exists(cursor, unitid):
                     print(f"Skipping record for UNITID {unitid}"
@@ -171,19 +179,31 @@ def load_ipeds_data(file_path):
                     skipped_records += 1
                     continue
 
-                # Clean and prepare data for insertion
-                cleaned_row = clean_data(row, available_columns)
+                try:
 
-                # Populate row data with static columns
-                row_data = [year, unitid] + [cleaned_row.get(col, None)
-                                             for col in static_columns]
+                    # Clean and prepare data for insertion
+                    cleaned_row = clean_data(row, available_columns)
 
-                # Add mapped columns, defaulting to None if they don't exist
-                for schema_col, csv_col in mapped_columns.items():
-                    row_data.append(cleaned_row.get(csv_col)
-                                    if csv_col else None)
+                    # Populate row data with static columns
+                    row_data = [data_year, unitid] + [
+                        cleaned_row.get(col, None) for col in static_columns]
 
-                ipeds_data.append(tuple(row_data))
+                    # Add mapped columns, defaulting to None if they no exist
+                    for schema_col, csv_col in mapped_columns.items():
+                        row_data.append(cleaned_row.get(csv_col)
+                                        if csv_col else None)
+
+                    ipeds_data.append(tuple(row_data))
+
+                except Exception as e:
+                    print(f"Error processing row {total_rows}: {row}")
+                    print(f"Error details: {e}")
+                    conn.rollback()
+                    sys.exit(1)
+
+            print(f"Total rows read from CSV: {total_rows}")
+            print(f"Total rows skipped: {skipped_records}")
+            print(f"Total rows prepared for insertion: {len(ipeds_data)}")
 
             # Insert data in batch if available
             if ipeds_data:
