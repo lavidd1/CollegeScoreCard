@@ -1,6 +1,6 @@
 # TODO
 
-DB_HOST = ""
-DB_NAME = ""
-DB_USER = ""
-DB_PASSWORD = ""
+DB_HOST = "pinniped.postgres.database.azure.com"
+DB_NAME = "dcli"
+DB_USER = "dcli"
+DB_PASSWORD = "$agyoZz7W6"
