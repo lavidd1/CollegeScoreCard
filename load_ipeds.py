@@ -28,7 +28,7 @@ def clean_data(row, columns):
     cleaned_data = {}
     for col in columns:
         value = row.get(col)
-        original_value = value  # Preserve the original value for debugging
+        # original_value = value  Preserve the original value for debugging
         if value is not None:
             value = value.strip()
         if value in ['-999', '', '-2', 'NULL', None, 'PrivacySuppressed']:
@@ -37,7 +37,8 @@ def clean_data(row, columns):
             cleaned_data[col] = value
         # Debug: Log original and cleaned values for the ADDR column
         # if col == "ADDR":
-        #     print(f"Column: {col}, Original: {original_value}, Cleaned: {cleaned_data[col]}")
+        #     print(f"Column: {col}, Original: {original_value},
+        #             Cleaned: {cleaned_data[col]}")
     return cleaned_data
 
 
@@ -69,12 +70,16 @@ def map_columns_by_year(columns, year):
         dict: Mapping of schema column names to corresponding CSV column names.
     """
     # Identify potential year prefixes in the columns
-    year_prefixes = {col[:3] for col in columns if col[:3].startswith("C") and col[1:3].isdigit()}
+    year_prefixes = {col[:3]
+                     for col
+                     in columns
+                     if col[:3].startswith("C") and col[1:3].isdigit()}
 
     # Try to find the prefix for the given year
     target_prefix = f"C{year % 100 - 1}"  # E.g., 2022 -> C21
     if target_prefix not in year_prefixes:
-        print(f"Warning: Prefix {target_prefix} not found in columns. Using available prefixes: {year_prefixes}")
+        print((f"Warning: Prefix {target_prefix} not found in columns.",
+               f"Using available prefixes: {year_prefixes}"))
         target_prefix = year_prefixes.pop() if year_prefixes else None
 
     if not target_prefix:
@@ -91,7 +96,8 @@ def map_columns_by_year(columns, year):
     }
 
     # Return the mapping of schema to available CSV columns
-    return {schema: col if col in columns else None for col, schema in mappings.items()}
+    return {schema: col if col in columns else None
+            for col, schema in mappings.items()}
 
 
 def preload_unitids(cursor):
@@ -114,7 +120,8 @@ def batch_insert_location(cursor, addr_updates):
         DO UPDATE SET ADDR = EXCLUDED.ADDR
         WHERE Location.ADDR IS NULL OR Location.ADDR = '';
     """
-    print(f"Address updates to process: {addr_updates[:10]}")  # Log a sample of updates
+    # Log a sample of updates
+    print(f"Address updates to process: {addr_updates[:10]}")
     cursor.executemany(sql, addr_updates)
     print("Address updates complete.")
 
@@ -130,7 +137,8 @@ def batch_insert_ipeds(cursor, data, columns, batch_size=1000):
         batch_size: The size of each batch for insertion.
     """
     placeholders = ', '.join(['%s'] * len(columns))
-    sql = f"INSERT INTO IPEDS_Directory ({', '.join(columns)}) VALUES ({placeholders})"
+    sql = (f"INSERT INTO IPEDS_Directory ({', '.join(columns)})",
+           f"VALUES ({placeholders})")
     for i in range(0, len(data), batch_size):
         cursor.executemany(sql, data[i:i + batch_size])
 
@@ -158,10 +166,12 @@ def load_ipeds_data(file_path):
 
             # Dynamically map columns
             mapped_columns = map_columns_by_year(available_columns, year)
-            static_columns = ["CBSA", "CBSATYPE", "CSA", "LATITUDE", "LONGITUD"]
+            static_columns = ["CBSA", "CBSATYPE", "CSA", "LATITUDE",
+                              "LONGITUD"]
             addr_column = "ADDR"
             yr_id_cols = ["YEAR", "UNITID"]
-            ipeds_directory_cols = yr_id_cols + static_columns + list(mapped_columns.keys())
+            ipeds_directory_cols = yr_id_cols + static_columns + \
+                list(mapped_columns.keys())
 
             ipeds_data = []
             addr_updates = []
@@ -183,14 +193,14 @@ def load_ipeds_data(file_path):
                     # Check if ADDR is NULL or missing
                     addr_value = cleaned_row.get(addr_column)
                     if addr_value is None:
-                        null_addr_count += 1  # Increment the counter for NULL ADDR
+                        null_addr_count += 1  # Count of NULL ADDR
 
                     # Prepare row data for IPEDS_Directory
-                    row_data = [data_year, unitid] + [
-                        cleaned_row.get(col, None) for col in static_columns
-                    ] + [
-                        cleaned_row.get(mapped_columns[col], None) for col in mapped_columns.keys()
-                    ]
+                    row_data = [data_year, unitid] + \
+                        [cleaned_row.get(col, None)
+                         for col in static_columns] + \
+                        [cleaned_row.get(mapped_columns[col], None)
+                         for col in mapped_columns.keys()]
                     ipeds_data.append(tuple(row_data))
 
                     # Collect ADDR updates if present
@@ -206,16 +216,18 @@ def load_ipeds_data(file_path):
             print(f"Total rows skipped: {skipped_records}")
             print(f"Total rows prepared IPEDS_Directory: {len(ipeds_data)}")
             print(f"Total ADDR updates for Location: {len(addr_updates)}")
-            print(f"Rows with NULL ADDR values: {null_addr_count}")  # Print NULL ADDR count
+            print(f"Rows with NULL ADDR values: {null_addr_count}")
 
             # Batch insert into Location table
             if addr_updates:
-                print(f"Updating {len(addr_updates)} records in Location table...")
+                print(f"Updating {len(addr_updates)} records",
+                      "in Location table...")
                 batch_insert_location(cursor, addr_updates)
 
             # Batch insert into IPEDS_Directory table
             if ipeds_data:
-                print(f"Inserting {len(ipeds_data)} records into IPEDS_Directory table...")
+                print((f"Inserting {len(ipeds_data)} records",
+                       "into IPEDS_Directory table..."))
                 batch_insert_ipeds(cursor, ipeds_data, ipeds_directory_cols)
 
             conn.commit()

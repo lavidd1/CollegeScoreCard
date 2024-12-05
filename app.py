@@ -1,11 +1,9 @@
 import streamlit as st
 import pandas as pd
 from load_ipeds import connect_db
-import sys
-import base64
 import plotly.express as px
 
-#Changed page settings so that tables fit; no need to scroll left/right
+# Changed page settings so that tables fit; no need to scroll left/right
 st.set_page_config(layout="wide", page_icon='🎓')
 
 
@@ -32,7 +30,8 @@ def query_data(query, parameters=None):
 
 # Set up queries
 query1 = """
-    SELECT loc.stabbr AS state, inst.control AS type, COUNT(*) AS num_institutions
+    SELECT loc.stabbr AS state, inst.control AS type, COUNT(*) AS
+    num_institutions
     FROM institutions AS inst
     JOIN location AS loc ON inst.unitid = loc.unitid
     JOIN ipeds_directory AS ipeds ON loc.unitid = ipeds.unitid
@@ -66,7 +65,10 @@ st.write("Explore data about institutions across the United States.")
 
 # Analysis 1: Number of Institutions by State and Type
 st.header("Number of Institutions by State and Type")
-selected_year_institutions = st.selectbox("Select Year for Institution Analysis", ['2018', '2019', '2020', '2021'], key="institutions_year")
+s1 = "Select Year for Institution Analysis"
+selected_year_institutions = st.selectbox(s1,
+                                          ['2018', '2019', '2020', '2021'],
+                                          key="institutions_year")
 data1 = query_data(query1, parameters=(selected_year_institutions,))
 data2 = query_data(query2, parameters=(selected_year_institutions,))
 data3 = query_data(query3, parameters=(selected_year_institutions,))
@@ -113,11 +115,13 @@ with row1_col3:
 with row1_col4:
     st.subheader("Institution Type Distribution")
     if data3 is not None and not data3.empty:
+        plot_title1 = "Institution Type Distribution for " + \
+                   f"{selected_year_institutions}"
         pie_chart = px.pie(
             data3,
             values="num_institutions",
             names="type",
-            title=f"Institution Type Distribution for {selected_year_institutions}",
+            title=plot_title1,
             color_discrete_sequence=px.colors.qualitative.Set3
         )
         st.plotly_chart(pie_chart, use_container_width=True)
@@ -128,13 +132,15 @@ with row1_col4:
 # Row 2: US Map by Institutions
 st.subheader("Number of Institutions by State (Map)")
 if data2 is not None and not data2.empty:
+    plot_title2 = "Number of Institutions by State " + \
+        f"for {selected_year_institutions}"
     map_chart = px.choropleth(
         data2,
         locations="state",  # State abbreviation
         locationmode="USA-states",  # Match state abbreviations
         color="num_institutions",  # Number of institutions
         hover_name="state",  # State name on hover
-        title=f"Number of Institutions by State for {selected_year_institutions}",
+        title=plot_title1,
         color_continuous_scale="Viridis",
         scope="usa"  # Focus on US map
     )
@@ -143,11 +149,13 @@ if data2 is not None and not data2.empty:
     map_chart.update_layout(
         height=800,  # Set the height of the map
         width=1200,  # Set the width of the map
-        margin={"r":0,"t":50,"l":0,"b":0}  # Adjust margins for better use of space
+        # Adjust margins for better use of space
+        margin={"r": 0, "t": 50, "l": 0, "b": 0}
     )
 
     # Render the map
-    st.plotly_chart(map_chart, use_container_width=False)  # Disable container width to use custom size
+    # Disable container width to use custom size
+    st.plotly_chart(map_chart, use_container_width=False)
 else:
     st.warning("No data available to generate the US map.")
 
@@ -166,7 +174,8 @@ query_tuition_summary = """
     JOIN
         Location loc ON inst.UNITID = loc.UNITID
     JOIN
-        IPEDS_Directory ipeds ON fin.UNITID = ipeds.UNITID AND fin.YEAR = ipeds.YEAR
+        IPEDS_Directory ipeds ON
+        fin.UNITID = ipeds.UNITID AND fin.YEAR = ipeds.YEAR
     WHERE
         fin.YEAR = %s
     GROUP BY
@@ -180,8 +189,11 @@ query_tuition_summary = """
 
 # Analysis 2: Tuition Rates by State and Carnegie Classification
 st.header("Tuition Rates by State and Carnegie Classification")
-selected_year_tuition = st.selectbox("Select Year for Tuition Analysis", ['2018', '2019', '2020', '2021', '2022'], key="tuition_year")
-tuition_data = query_data(query_tuition_summary, parameters=(selected_year_tuition,))
+selected_year_tuition = st.selectbox("Select Year for Tuition Analysis",
+                                     ['2018', '2019', '2020', '2021', '2022'],
+                                     key="tuition_year")
+tuition_data = query_data(query_tuition_summary,
+                          parameters=(selected_year_tuition,))
 
 
 # Display results
@@ -189,7 +201,8 @@ if tuition_data is not None and not tuition_data.empty:
     st.write(f"### Tuition Rate Summary for {selected_year_tuition}")
     st.dataframe(tuition_data, use_container_width=True)
 else:
-    st.warning(f"No tuition data available for the year {selected_year_tuition}.")
+    w1 = f"No tuition data available for the year {selected_year_tuition}."
+    st.warning(w1)
 
 if tuition_data is not None and not tuition_data.empty:
     st.subheader("Average Tuition Rates by Carnegie Classification")
@@ -198,7 +211,8 @@ if tuition_data is not None and not tuition_data.empty:
         x="carnegie_classification",
         y=["avg_in_state_tuition", "avg_out_state_tuition"],
         title="Average Tuition Rates by Carnegie Classification",
-        labels={"carnegie_classification": "Carnegie Classification", "value": "Tuition Rate"},
+        labels={"carnegie_classification": "Carnegie Classification",
+                "value": "Tuition Rate"},
         barmode="group",
         height=500,
     )
@@ -210,76 +224,65 @@ else:
 # Best- and worst-performing institutions by loan repayment rates
 query_repayment = """
 (
-    SELECT 
+    SELECT
         inst.INSTNM AS institution_name,
         loc.STABBR AS state,
         fin.CDR3 AS loan_repayment_rate,
         'Best' AS category
-    FROM 
+    FROM
         Institutions inst
-    JOIN 
+    JOIN
         Location loc ON inst.UNITID = loc.UNITID
-    JOIN 
+    JOIN
         Financial_Data fin ON inst.UNITID = fin.UNITID
-    WHERE 
+    WHERE
         fin.YEAR = %s
-    ORDER BY 
+    ORDER BY
         fin.CDR3 ASC  -- Lowest default rates (best repayment rates)
     LIMIT 5
 )
 UNION
 (
-    SELECT 
+    SELECT
         inst.INSTNM AS institution_name,
         loc.STABBR AS state,
         fin.CDR3 AS loan_repayment_rate,
         'Worst' AS category
-    FROM 
+    FROM
         Institutions inst
-    JOIN 
+    JOIN
         Location loc ON inst.UNITID = loc.UNITID
-    JOIN 
+    JOIN
         Financial_Data fin ON inst.UNITID = fin.UNITID
-    WHERE 
+    WHERE
         fin.YEAR = %s
-    ORDER BY 
+    ORDER BY
         fin.CDR3 DESC  -- Highest default rates (worst repayment rates)
     LIMIT 5
 )
-ORDER BY 
+ORDER BY
     category, loan_repayment_rate;
 """
 
 # Streamlit Analysis 3: Best and Worst Institutions by Loan Repayment Rates
 st.header("Best- and Worst-Performing Institutions by Loan Repayment Rates")
-
-selected_year_repayment = st.selectbox("Select Year for Loan Repayment Analysis", ['2018', '2019', '2020', '2021'], key="repayment_year")
+s2 = "Select Year for Loan Repayment Analysis"
+selected_year_repayment = st.selectbox(s2,
+                                       ['2018', '2019', '2020', '2021'],
+                                       key="repayment_year")
 
 # Execute the query with the year parameter passed twice
-repayment_data = query_data(query_repayment, parameters=(selected_year_repayment, selected_year_repayment))
+repayment_data = query_data(query_repayment,
+                            parameters=(selected_year_repayment,
+                                        selected_year_repayment))
 
 if repayment_data is not None and not repayment_data.empty:
     st.subheader("Loan Repayment Performance")
     st.dataframe(repayment_data, use_container_width=True)
 else:
-    st.warning(f"No repayment data available for the year {selected_year_repayment}.")
+    w2 = f"No repayment data available for the year {selected_year_repayment}."
+    st.warning(w2)
 
-#Commenting this for now as the values for worst performing are None- hence considered worst by default
-#if repayment_data is not None and not repayment_data.empty:
-    #st.subheader("Best and Worst Loan Repayment Rates Comparison")
-    #dual_bar_chart = px.bar(
-        #repayment_data,
-        #x="institution_name",
-        #y="loan_repayment_rate",
-        #color="category",
-        #barmode="group",
-        #title=f"Best vs Worst Loan Repayment Rates for {selected_year_repayment}",
-        #labels={"loan_repayment_rate": "Repayment Rate", "institution_name": "Institution Name"},
-        #height=500,
-    #)
-    #st.plotly_chart(dual_bar_chart, use_container_width=True)
-#else:
-    #st.warning("No data available to generate the dual bar chart.")
 
 # Analysis 4: Tuition Rates and Loan Repayment Trends Over Time
 st.header("Trends in Tuition Rates and Loan Repayment Rates Over Time")
@@ -290,22 +293,22 @@ analysis_type = st.radio(
     ["Aggregate Trends", "Selected Institutions"]
 )
 
-# Aggregate Trends
+# Aggregate Trends-------------------------------------------------
 if analysis_type == "Aggregate Trends":
     query_aggregate_trends = """
-        SELECT 
+        SELECT
             fin.YEAR AS year,
             inst.CONTROL AS institution_type,
             AVG(fin.TUITIONFEE_IN) AS avg_in_state_tuition,
             AVG(fin.TUITIONFEE_OUT) AS avg_out_state_tuition,
             AVG(fin.CDR3) AS avg_loan_repayment_rate
-        FROM 
+        FROM
             Financial_Data fin
-        JOIN 
+        JOIN
             Institutions inst ON fin.UNITID = inst.UNITID
-        GROUP BY 
+        GROUP BY
             fin.YEAR, inst.CONTROL
-        ORDER BY 
+        ORDER BY
             fin.YEAR, inst.CONTROL;
     """
     aggregate_data = query_data(query_aggregate_trends)
@@ -313,15 +316,17 @@ if analysis_type == "Aggregate Trends":
     if aggregate_data is not None and not aggregate_data.empty:
         # Ensure column names are lowercase for consistency
         aggregate_data.columns = aggregate_data.columns.str.lower()
-
-        st.subheader("Average Tuition Rates and Loan Repayment Rates (Aggregate)")
+        s3 = "Average Tuition Rates and Loan Repayment Rates (Aggregate)"
+        st.subheader(s3)
         fig = px.line(
             aggregate_data,
             x="year",  # Ensure lowercase column name
-            y=["avg_in_state_tuition", "avg_out_state_tuition", "avg_loan_repayment_rate"],
+            y=["avg_in_state_tuition", "avg_out_state_tuition",
+               "avg_loan_repayment_rate"],
             color="institution_type",
             title="Tuition and Loan Repayment Trends (Aggregate)",
-            labels={"year": "Year", "value": "Rate", "institution_type": "Institution Type"},
+            labels={"year": "Year", "value": "Rate",
+                    "institution_type": "Institution Type"},
             height=500
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -331,25 +336,25 @@ if analysis_type == "Aggregate Trends":
 # Selected Institutions
 elif analysis_type == "Selected Institutions":
     query_selected_trends = """
-        SELECT 
+        SELECT
             fin.YEAR AS year,
             inst.INSTNM AS institution_name,
             fin.TUITIONFEE_IN AS in_state_tuition,
             fin.TUITIONFEE_OUT AS out_state_tuition,
             fin.CDR3 AS loan_repayment_rate
-        FROM 
+        FROM
             Financial_Data fin
-        JOIN 
+        JOIN
             Institutions inst ON fin.UNITID = inst.UNITID
-        WHERE 
+        WHERE
             inst.INSTNM IN (
-                SELECT INSTNM 
-                FROM Institutions inst 
+                SELECT INSTNM
+                FROM Institutions inst
                 JOIN Financial_Data fin ON inst.UNITID = fin.UNITID
                 ORDER BY fin.TUITIONFEE_OUT DESC
                 LIMIT 5
             )
-        ORDER BY 
+        ORDER BY
             fin.YEAR, inst.INSTNM;
     """
     selected_data = query_data(query_selected_trends)
@@ -365,7 +370,8 @@ elif analysis_type == "Selected Institutions":
             y=["in_state_tuition", "out_state_tuition", "loan_repayment_rate"],
             color="institution_name",
             title="Tuition and Loan Repayment Trends (Selected Institutions)",
-            labels={"year": "Year", "value": "Rate", "institution_name": "Institution Name"},
+            labels={"year": "Year", "value": "Rate",
+                    "institution_name": "Institution Name"},
             height=500
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -373,30 +379,37 @@ elif analysis_type == "Selected Institutions":
         st.warning("No data available for selected institutions.")
 
 
-# Analysis 5: Correlation between Tuition, Loan Repayment Rates, and Faculty Salaries
-st.header("Correlation Analysis: Tuition, Loan Repayment Rates, and Faculty Salaries")
+# Analysis 5: Correlation between Tuition, Loan Repayment Rates,
+# and Faculty Salaries
+h1 = "Correlation Analysis: Tuition, Loan Repayment Rates, " + \
+    "and Faculty Salaries"
+st.header(h1)
 
 # Year selection
-selected_year_correlation = st.selectbox("Select Year for Correlation Analysis", ['2018', '2019', '2020', '2021'], key="correlation_year")
+s4 = "Select Year for Correlation Analysis"
+selected_year_correlation = st.selectbox(s4,
+                                         ['2018', '2019', '2020', '2021'],
+                                         key="correlation_year")
 
 # Query data
 query_correlation = """
-    SELECT 
+    SELECT
         inst.INSTNM AS institution_name,
         fin.TUITIONFEE_IN AS in_state_tuition,
         fin.TUITIONFEE_OUT AS out_state_tuition,
         fin.CDR3 AS loan_repayment_rate,
         fin.AVGFACSAL AS avg_faculty_salary
-    FROM 
+    FROM
         Financial_Data fin
-    JOIN 
+    JOIN
         Institutions inst ON fin.UNITID = inst.UNITID
-    WHERE 
+    WHERE
         fin.YEAR = %s
-    ORDER BY 
+    ORDER BY
         inst.INSTNM;
 """
-correlation_data = query_data(query_correlation, parameters=(selected_year_correlation,))
+correlation_data = query_data(query_correlation,
+                              parameters=(selected_year_correlation,))
 
 # Check if data is available
 if correlation_data is not None and not correlation_data.empty:
@@ -405,7 +418,10 @@ if correlation_data is not None and not correlation_data.empty:
 
     # Convert data types to numeric for correlation analysis
     correlation_data.columns = correlation_data.columns.str.lower()
-    numeric_data = correlation_data[["in_state_tuition", "out_state_tuition", "loan_repayment_rate", "avg_faculty_salary"]].apply(pd.to_numeric, errors="coerce")
+    correlation_cols = ["in_state_tuition", "out_state_tuition",
+                        "loan_repayment_rate", "avg_faculty_salary"]
+    numeric_data = correlation_data[correlation_cols].apply(pd.to_numeric,
+                                                            errors="coerce")
 
     # Display Correlation Matrix
     st.subheader("Correlation Matrix")
@@ -428,17 +444,22 @@ if correlation_data is not None and not correlation_data.empty:
     st.subheader("Scatter Plots to Visualize Correlations")
     scatter_columns = st.multiselect(
         "Select Columns for Scatter Plot",
-        options=["in_state_tuition", "out_state_tuition", "loan_repayment_rate", "avg_faculty_salary"],
+        options=["in_state_tuition", "out_state_tuition",
+                 "loan_repayment_rate", "avg_faculty_salary"],
         default=["in_state_tuition", "loan_repayment_rate"]
     )
     if len(scatter_columns) == 2:
+        plot_title3 = f"Scatter Plot: {scatter_columns[0]} vs " + \
+            f"{scatter_columns[1]}"
         fig_scatter = px.scatter(
             numeric_data,
             x=scatter_columns[0],
             y=scatter_columns[1],
-            title=f"Scatter Plot: {scatter_columns[0]} vs {scatter_columns[1]}",
-            labels={scatter_columns[0]: scatter_columns[0].replace("_", " ").title(),
-                    scatter_columns[1]: scatter_columns[1].replace("_", " ").title()},
+            title=plot_title3,
+            labels={scatter_columns[0]:
+                    scatter_columns[0].replace("_", " ").title(),
+                    scatter_columns[1]:
+                    scatter_columns[1].replace("_", " ").title()},
             height=500
         )
         st.plotly_chart(fig_scatter, use_container_width=True)
@@ -452,16 +473,16 @@ st.header("Trends in Graduate Debt Over Time")
 
 # Query to fetch graduate debt trends
 query_grad_debt = """
-    SELECT 
+    SELECT
         YEAR AS year,
         AVG(GRAD_DEBT_MDN) AS avg_grad_debt
-    FROM 
+    FROM
         Admissions_Data
-    WHERE 
+    WHERE
         GRAD_DEBT_MDN IS NOT NULL
-    GROUP BY 
+    GROUP BY
         YEAR
-    ORDER BY 
+    ORDER BY
         YEAR;
 """
 
@@ -479,7 +500,8 @@ if grad_debt_data is not None and not grad_debt_data.empty:
         x="year",
         y="avg_grad_debt",
         title="Trends in Graduate Debt Over Time",
-        labels={"year": "Year", "avg_grad_debt": "Average Graduate Debt (USD)"},
+        labels={"year": "Year",
+                "avg_grad_debt": "Average Graduate Debt (USD)"},
         height=500
     )
     st.plotly_chart(fig_grad_debt, use_container_width=True)
@@ -492,19 +514,19 @@ st.header("Top Institutions by Faculty Salaries")
 # SQL query to fetch top institutions
 # Enhanced SQL query to include institution type
 query_top_salaries_enhanced = """
-    SELECT 
+    SELECT
         inst.INSTNM AS institution_name,
         fin.AVGFACSAL AS avg_faculty_salary,
         fin.TUITIONFEE_IN AS in_state_tuition,
         fin.TUITIONFEE_OUT AS out_state_tuition,
         inst.CONTROL AS institution_type
-    FROM 
+    FROM
         Financial_Data fin
-    JOIN 
+    JOIN
         Institutions inst ON fin.UNITID = inst.UNITID
-    WHERE 
+    WHERE
         fin.AVGFACSAL IS NOT NULL
-    ORDER BY 
+    ORDER BY
         fin.AVGFACSAL DESC
     LIMIT 10;
 """
@@ -513,7 +535,8 @@ query_top_salaries_enhanced = """
 # Fetch enhanced data
 faculty_salary_data_enhanced = query_data(query_top_salaries_enhanced)
 
-if faculty_salary_data_enhanced is not None and not faculty_salary_data_enhanced.empty:
+if (faculty_salary_data_enhanced is not None and
+        not faculty_salary_data_enhanced.empty):
     st.subheader("Top Institutions by Faculty Salaries")
 
     # Display the dataframe
@@ -537,12 +560,14 @@ if faculty_salary_data_enhanced is not None and not faculty_salary_data_enhanced
     st.plotly_chart(fig_salaries_grouped, use_container_width=True)
 
     # Optional scatter plot for correlation
+    plot_title4 = "Correlation between Faculty Salaries and " + \
+        "Tuition Fees (In-State)"
     fig_correlation = px.scatter(
         faculty_salary_data_enhanced,
         x="avg_faculty_salary",
         y="in_state_tuition",
         color="institution_name",
-        title="Correlation between Faculty Salaries and Tuition Fees (In-State)",
+        title=plot_title4,
         labels={
             "avg_faculty_salary": "Average Faculty Salary (USD)",
             "in_state_tuition": "In-State Tuition (USD)"
@@ -553,7 +578,6 @@ if faculty_salary_data_enhanced is not None and not faculty_salary_data_enhanced
 
 else:
     st.warning("No data available for enhanced faculty salaries analysis.")
-
 
 
 # Footer
