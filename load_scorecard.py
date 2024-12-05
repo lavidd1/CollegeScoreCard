@@ -36,8 +36,10 @@ def clean_data(row, columns):
     cleaned_data = {}
     for col in columns:
         value = row.get(col)
+        if value is not None:
+            value = value.strip()
         # Convert missing, empty, or redacted values to None
-        if value in ['-999', '', 'NULL', None, 'PrivacySuppressed']:
+        if value in ['-999', '', '-2', 'NULL', None, 'PrivacySuppressed']:
             cleaned_data[col] = None
         else:
             cleaned_data[col] = value
@@ -110,7 +112,7 @@ def load_scorecard_data(file_path):
                 "PREDDEG", "HIGHDEG"
             ]
             location_columns = [
-                "UNITID", "REGION", "ST_FIPS", "ADDRESS", "CITY",
+                "UNITID", "REGION", "ST_FIPS", "ADDR", "CITY",
                 "STABBR", "ZIP"
             ]
             financial_data_columns = [
