@@ -28,29 +28,24 @@ def clean_data(row, columns):
     cleaned_data = {}
     for col in columns:
         value = row.get(col)
-        # original_value = value  Preserve the original value for debugging
         if value is not None:
             value = value.strip()
         if value in ['-999', '', '-2', 'NULL', None, 'PrivacySuppressed']:
             cleaned_data[col] = None
         else:
             cleaned_data[col] = value
-        # Debug: Log original and cleaned values for the ADDR column
-        # if col == "ADDR":
-        #     print(f"Column: {col}, Original: {original_value},
-        #             Cleaned: {cleaned_data[col]}")
     return cleaned_data
 
 
 def extract_year_from_filename(filename):
     """
-    Extracts the year from filename.
+    Extracts the year from the filename.
 
-    Parameters:
-    filename (str): The filename from which to extract the year.
+    Args:
+        filename (str): The filename from which to extract the year.
 
     Returns:
-    int: The year extracted from the filename with format YYYY.
+        int: The year extracted from the filename with format YYYY.
     """
     match = re.search(r'hd(\d{4})\.csv$', filename)
     if not match:
@@ -60,49 +55,55 @@ def extract_year_from_filename(filename):
 
 def map_columns_by_year(columns, year):
     """
-    Dynamically maps CSV column names to schema names based on the year.
+    Maps CSV column names to schema names based on the year.
 
     Args:
         columns (list): List of column names from the CSV file.
-        year (int): The academic year used to determine year-specific prefixes.
+        year (int): The academic year to determine year-specific prefixes.
 
     Returns:
-        dict: Mapping of schema column names to corresponding CSV column names.
+        dict: Mapping of schema column names to corresponding CSV columns.
     """
-    # Identify potential year prefixes in the columns
-    year_prefixes = {col[:3]
-                     for col
-                     in columns
-                     if col[:3].startswith("C") and col[1:3].isdigit()}
+    if year >= 2020:
+        target_prefix = "C21"
+    elif year >= 2017:
+        target_prefix = "C18"
+    else:
+        raise ValueError("Year not supported: Carnegie classifications "
+                         "start from 2017.")
 
-    # Try to find the prefix for the given year
-    target_prefix = f"C{year % 100 - 1}"  # E.g., 2022 -> C21
+    year_prefixes = {col[:3] for col in columns if col[:3].startswith("C") and
+                     col[1:3].isdigit()}
+
     if target_prefix not in year_prefixes:
-        print((f"Warning: Prefix {target_prefix} not found in columns.",
-               f"Using available prefixes: {year_prefixes}"))
+        print(f"Warning: Expected prefix {target_prefix} not found. "
+              f"Using available prefixes: {year_prefixes}")
         target_prefix = year_prefixes.pop() if year_prefixes else None
 
     if not target_prefix:
         raise ValueError("No valid year prefix found in columns.")
 
-    # Map schema columns to CSV columns
     mappings = {
-        f"{target_prefix}BASIC": "CCBASIC",
-        f"{target_prefix}UGPRF": "CCUGPROF",
-        f"{target_prefix}SZSET": "CCSIZSET",
-        f"{target_prefix}IPUG": "CCIPUG",
-        f"{target_prefix}IPGRD": "CCIPGRD",
-        f"{target_prefix}ENPRF": "CCENPROF",
+        "CCBASIC": f"{target_prefix}BASIC",
+        "CCUGPROF": f"{target_prefix}UGPRF",
+        "CCSIZSET": f"{target_prefix}SZSET",
+        "CCIPUG": f"{target_prefix}IPUG",
+        "CCIPGRD": f"{target_prefix}IPGRD",
+        "CCENPROF": f"{target_prefix}ENPRF",
     }
 
-    # Return the mapping of schema to available CSV columns
-    return {schema: col if col in columns else None
-            for col, schema in mappings.items()}
+    return {schema: col for schema, col in mappings.items() if col in columns}
 
 
 def preload_unitids(cursor):
     """
     Preloads all UNITID values from the Institutions table into memory.
+
+    Args:
+        cursor: The database cursor object.
+
+    Returns:
+        set: A set of UNITID values from the Institutions table.
     """
     cursor.execute("SELECT UNITID FROM Institutions")
     return set(row[0] for row in cursor.fetchall())
@@ -111,6 +112,10 @@ def preload_unitids(cursor):
 def batch_insert_location(cursor, addr_updates):
     """
     Batch inserts or updates the ADDR values in the Location table.
+
+    Args:
+        cursor: The database cursor object.
+        addr_updates (list): A list of tuples containing UNITID and ADDR.
     """
     print(f"Processing {len(addr_updates)} address updates...")
     sql = """
@@ -120,8 +125,6 @@ def batch_insert_location(cursor, addr_updates):
         DO UPDATE SET ADDR = EXCLUDED.ADDR
         WHERE Location.ADDR IS NULL OR Location.ADDR = '';
     """
-    # Log a sample of updates
-    print(f"Address updates to process: {addr_updates[:10]}")
     cursor.executemany(sql, addr_updates)
     print("Address updates complete.")
 
@@ -137,8 +140,8 @@ def batch_insert_ipeds(cursor, data, columns, batch_size=1000):
         batch_size: The size of each batch for insertion.
     """
     placeholders = ', '.join(['%s'] * len(columns))
-    sql = f"INSERT INTO IPEDS_Directory ({', '.join(columns)})" + \
-          f"VALUES ({placeholders})"
+    sql = f"INSERT INTO IPEDS_Directory ({', '.join(columns)}) VALUES " \
+          f"({placeholders})"
     for i in range(0, len(data), batch_size):
         cursor.executemany(sql, data[i:i + batch_size])
 
@@ -146,6 +149,9 @@ def batch_insert_ipeds(cursor, data, columns, batch_size=1000):
 def load_ipeds_data(file_path):
     """
     Loads IPEDS data and updates the Location and IPEDS_Directory tables.
+
+    Args:
+        file_path (str): The path to the CSV file to load.
     """
     conn = connect_db()
     cursor = conn.cursor()
@@ -153,18 +159,15 @@ def load_ipeds_data(file_path):
     data_year = year
 
     try:
-        # Preload UNITID values from the Institutions table
         existing_unitids = preload_unitids(cursor)
 
         with open(file_path, mode='r', encoding='ISO-8859-1') as file:
             reader = csv.DictReader(file)
             available_columns = reader.fieldnames
 
-            # Validate that ADDR column exists in the CSV
             if "ADDR" not in available_columns:
                 raise ValueError("ADDR column missing from CSV file.")
 
-            # Dynamically map columns
             mapped_columns = map_columns_by_year(available_columns, year)
             static_columns = ["CBSA", "CBSATYPE", "CSA", "LATITUDE",
                               "LONGITUD"]
@@ -177,7 +180,7 @@ def load_ipeds_data(file_path):
             addr_updates = []
             skipped_records = 0
             total_rows = 0
-            null_addr_count = 0  # Counter for rows with NULL ADDR
+            null_addr_count = 0
 
             for row in reader:
                 total_rows += 1
@@ -186,52 +189,40 @@ def load_ipeds_data(file_path):
                     skipped_records += 1
                     continue
 
-                try:
-                    # Clean and prepare data for IPEDS_Directory table
-                    cleaned_row = clean_data(row, available_columns)
+                cleaned_row = clean_data(row, available_columns)
+                addr_value = cleaned_row.get(addr_column)
+                if addr_value is None:
+                    null_addr_count += 1
 
-                    # Check if ADDR is NULL or missing
-                    addr_value = cleaned_row.get(addr_column)
-                    if addr_value is None:
-                        null_addr_count += 1  # Count of NULL ADDR
+                row_data = [data_year, unitid] + \
+                    [cleaned_row.get(col, None) for col in static_columns] + \
+                    [cleaned_row.get(mapped_columns[col], None)
+                     for col in mapped_columns.keys()]
+                ipeds_data.append(tuple(row_data))
 
-                    # Prepare row data for IPEDS_Directory
-                    row_data = [data_year, unitid] + \
-                        [cleaned_row.get(col, None)
-                         for col in static_columns] + \
-                        [cleaned_row.get(mapped_columns[col], None)
-                         for col in mapped_columns.keys()]
-                    ipeds_data.append(tuple(row_data))
+                if addr_value:
+                    addr_updates.append((unitid, addr_value))
 
-                    # Collect ADDR updates if present
-                    if addr_value:
-                        addr_updates.append((unitid, addr_value))
+            print("\nSummary:")
+            print(f"- Total rows read from CSV: {total_rows}")
+            print(f"- Total rows skipped: {skipped_records}")
+            print(f"- Total rows prepared for IPEDS_Directory: "
+                  f"{len(ipeds_data)}")
+            print(f"- Total ADDR updates for Location: {len(addr_updates)}")
+            print(f"- Rows with NULL ADDR values: {null_addr_count}")
 
-                except Exception as e:
-                    print(f"Error processing row {total_rows}: {row}")
-                    print(f"Error details: {e}")
-                    skipped_records += 1
-
-            print(f"Total rows read from CSV: {total_rows}")
-            print(f"Total rows skipped: {skipped_records}")
-            print(f"Total rows prepared IPEDS_Directory: {len(ipeds_data)}")
-            print(f"Total ADDR updates for Location: {len(addr_updates)}")
-            print(f"Rows with NULL ADDR values: {null_addr_count}")
-
-            # Batch insert into Location table
             if addr_updates:
-                print(f"Updating {len(addr_updates)} records",
-                      "in Location table...")
+                print(f"\nUpdating {len(addr_updates)} records in "
+                      f"Location table...")
                 batch_insert_location(cursor, addr_updates)
 
-            # Batch insert into IPEDS_Directory table
             if ipeds_data:
-                print((f"Inserting {len(ipeds_data)} records",
-                       "into IPEDS_Directory table..."))
+                print(f"\nInserting {len(ipeds_data)} records into "
+                      f"IPEDS_Directory table...")
                 batch_insert_ipeds(cursor, ipeds_data, ipeds_directory_cols)
 
             conn.commit()
-            print("IPEDS data loaded successfully.")
+            print("\nIPEDS data loaded successfully.")
 
     except Exception as e:
         conn.rollback()
