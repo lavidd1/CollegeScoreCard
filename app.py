@@ -67,7 +67,7 @@ st.write("Explore data about institutions across the United States.")
 st.header("Number of Institutions by State and Type")
 s1 = "Select Year for Institution Analysis"
 selected_year_institutions = st.selectbox(s1,
-                                          ['2018', '2019', '2020', '2021'],
+                                          ['2019', '2020', '2021', '2022'],
                                           key="institutions_year",
                                           index=2)
 data1 = query_data(query1, parameters=(selected_year_institutions,))
@@ -211,7 +211,7 @@ query_tuition_summary2 = """
 # Analysis 2: Tuition Rates by State and Carnegie Classification
 st.header("Tuition Rates by State and Carnegie Classification")
 selected_year_tuition = st.selectbox("Select Year for Tuition Analysis",
-                                     ['2018', '2019', '2020', '2021', '2022'],
+                                     ['2019', '2020', '2021', '2022'],
                                      key="tuition_year",
                                      index=2)
 tuition_data1 = query_data(query_tuition_summary1,
@@ -293,7 +293,7 @@ ORDER BY
 st.header("Best- and Worst-Performing Institutions by Loan Repayment Rates")
 s2 = "Select Year for Loan Repayment Analysis"
 selected_year_repayment = st.selectbox(s2,
-                                       ['2018', '2019', '2020', '2021'],
+                                       ['2019', '2020', '2021', '2022'],
                                        key="repayment_year",
                                        index=2)
 
@@ -441,7 +441,7 @@ st.header(h1)
 # Year selection
 s5 = "Select Year for Correlation Analysis"
 selected_year_correlation = st.selectbox(s4,
-                                         ['2018', '2019', '2020', '2021'],
+                                         ['2019', '2020', '2021', '2022'],
                                          key="correlation_year",
                                          index=2)
 

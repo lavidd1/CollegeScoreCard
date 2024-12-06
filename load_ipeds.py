@@ -137,8 +137,8 @@ def batch_insert_ipeds(cursor, data, columns, batch_size=1000):
         batch_size: The size of each batch for insertion.
     """
     placeholders = ', '.join(['%s'] * len(columns))
-    sql = (f"INSERT INTO IPEDS_Directory ({', '.join(columns)})",
-           f"VALUES ({placeholders})")
+    sql = f"INSERT INTO IPEDS_Directory ({', '.join(columns)})" + \
+          f"VALUES ({placeholders})"
     for i in range(0, len(data), batch_size):
         cursor.executemany(sql, data[i:i + batch_size])
 
