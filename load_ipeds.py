@@ -150,7 +150,7 @@ def load_ipeds_data(file_path):
     conn = connect_db()
     cursor = conn.cursor()
     year = extract_year_from_filename(file_path)
-    data_year = year - 1
+    data_year = year
 
     try:
         # Preload UNITID values from the Institutions table
